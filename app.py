@@ -14,6 +14,7 @@ st.markdown("""
     <style>
     .match-card { background-color: #f8f9fa; padding: 20px; border-radius: 15px; margin-bottom: 20px; border-left: 6px solid #ff4b4b; box-shadow: 2px 2px 10px rgba(0,0,0,0.1); }
     .round-header { background-color: #1e3a8a; color: white; padding: 15px; border-radius: 8px; margin-top: 40px; margin-bottom: 20px; text-align: center; font-weight: bold; }
+    .predictions-box { background-color: #ffffff; border: 2px solid #1e3a8a; border-radius: 10px; padding: 15px; margin-top: 10px; box-shadow: 3px 3px 15px rgba(30, 58, 138, 0.2); }
     </style>
     """, unsafe_allow_html=True)
 
@@ -115,7 +116,6 @@ with tab1:
     for m in matches:
         if m['round'] != current_round:
             current_round = m['round']
-            # שינוי לכותרת עם Round וצבע כחול
             st.markdown(f'<div class="round-header">Round: {current_round}</div>', unsafe_allow_html=True)
         
         is_locked = m["status"] != "Upcoming"
@@ -137,9 +137,11 @@ with tab1:
             st.rerun()
             
         if is_locked:
-            with st.expander("View All Predictions"):
-                data = [{"Player": pl, "Prediction": f"{m['all_preds'].get(pl, 'Unsubmitted')}"} for pl in all_players]
-                st.table(pd.DataFrame(data))
+            st.markdown('<div class="predictions-box">', unsafe_allow_html=True)
+            st.markdown("<b>👥 All Predictions:</b>", unsafe_allow_html=True)
+            data = [{"Player": pl, "Prediction": f"{m['all_preds'].get(pl, 'Unsubmitted')}"} for pl in all_players]
+            st.table(pd.DataFrame(data))
+            st.markdown('</div>', unsafe_allow_html=True)
 
 with tab2:
     st.markdown("## 📊 League Standings")
