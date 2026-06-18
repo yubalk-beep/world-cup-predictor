@@ -5,12 +5,10 @@ import requests
 import gspread
 import json
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
 
 # Page configuration
 st.set_page_config(page_title="World Cup Predictor", page_icon="⚽", layout="centered")
 
-API_KEY = "fca580857f6cf30156ef0e1526082430"
 SPREADSHEET_NAME = "WorldCupPredictions"
 
 # --- Google Sheets Connection ---
@@ -70,7 +68,7 @@ all_db_preds = load_all_predictions(sheet)
 def get_live_fixtures():
     url = "https://v3.football.api-sports.io/fixtures"
     querystring = {"league": "1", "season": "2026"}
-    headers = {"x-apisports-key": API_KEY, "x-apisports-host": "v3.football.api-sports.io"}
+    headers = {"x-apisports-key": "fca580857f6cf30156ef0e1526082430", "x-apisports-host": "v3.football.api-sports.io"}
     try:
         response = requests.get(url, headers=headers, params=querystring)
         data = response.json()
@@ -92,9 +90,15 @@ for am in api_matches:
     is_live = am['fixture']['status']['short'] in ['1H', 'HT', '2H', 'ET', 'P', 'LIVE']
     is_finished = am['fixture']['status']['short'] in ['FT', 'AET', 'PEN']
     status_display = "LIVE" if is_live else ("Finished" if is_finished else "Upcoming")
+    
+    # המרה לשעון ישראל
+    match_time_il = pd.to_datetime(am['fixture']['date']).tz_convert('Asia/Jerusalem').strftime('%d/%m/%Y %H:%M')
+    
     matches.append({
         "id": m_id, "home": am['teams']['home']['name'], "away": am['teams']['away']['name'],
-        "status": status_display, "live_home": am['goals']['home'] or 0, "live_away": am['goals']['away'] or 0,
+        "status": status_display, "date_str": match_time_il,
+        "live_home": am['goals']['home'] if am['goals']['home'] is not None else 0,
+        "live_away": am['goals']['away'] if am['goals']['away'] is not None else 0,
         "all_preds": all_db_preds.get(m_id, {})
     })
 
@@ -115,10 +119,16 @@ with tab1:
     for m in matches:
         is_locked = m["status"] in ["LIVE", "Finished"]
         current_pred = m["all_preds"].get(selected_user, (0, 0))
-        st.markdown(f"#### {m['home']} vs {m['away']} - {m['status']}")
+        
+        st.markdown(f"### {m['home']} vs {m['away']}")
+        st.write(f"🕒 {m['date_str']} | Status: **{m['status']}**")
+        if m["status"] in ["LIVE", "Finished"]:
+            st.markdown(f"**Score: {m['live_home']} - {m['live_away']}**")
+            
         c1, c2 = st.columns(2)
-        ph = c1.number_input(f"{m['home']}", value=int(current_pred[0]), disabled=is_locked, key=f"h_{m['id']}_{selected_user}")
-        pa = c2.number_input(f"{m['away']}", value=int(current_pred[1]), disabled=is_locked, key=f"a_{m['id']}_{selected_user}")
+        ph = c1.number_input(f"{m['home']}", value=int(current_pred[0]), disabled=is_locked, key=f"h_{m['id']}_{selected_user}", min_value=0)
+        pa = c2.number_input(f"{m['away']}", value=int(current_pred[1]), disabled=is_locked, key=f"a_{m['id']}_{selected_user}", min_value=0)
+        
         if not is_locked and st.button("Save 💾", key=f"btn_{m['id']}_{selected_user}"):
             save_prediction_to_sheet(sheet, m['id'], selected_user, ph, pa)
             st.rerun()
