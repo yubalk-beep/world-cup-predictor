@@ -13,7 +13,7 @@ st.set_page_config(page_title="World Cup Predictor", page_icon="⚽", layout="ce
 st.markdown("""
     <style>
     .match-card { background-color: #f8f9fa; padding: 20px; border-radius: 15px; margin-bottom: 20px; border-left: 6px solid #ff4b4b; box-shadow: 2px 2px 10px rgba(0,0,0,0.1); }
-    .round-header { background-color: #ff4b4b; color: white; padding: 10px; border-radius: 5px; margin-top: 30px; text-align: center; }
+    .round-header { background-color: #1e3a8a; color: white; padding: 15px; border-radius: 8px; margin-top: 40px; margin-bottom: 20px; text-align: center; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -110,12 +110,13 @@ def calc_points(ph, pa, ah, aa):
 tab1, tab2 = st.tabs(["⚽ My Predictions", "📊 Live Table"])
 
 with tab1:
-    selected_user = st.selectbox("Log in as:", all_players)
+    selected_user = st.selectbox("Select Player:", all_players)
     current_round = ""
     for m in matches:
         if m['round'] != current_round:
             current_round = m['round']
-            st.markdown(f'<div class="round-header"><h3>{current_round}</h3></div>', unsafe_allow_html=True)
+            # שינוי לכותרת עם Round וצבע כחול
+            st.markdown(f'<div class="round-header">Round: {current_round}</div>', unsafe_allow_html=True)
         
         is_locked = m["status"] != "Upcoming"
         p = m["all_preds"].get(selected_user, (0, 0))
