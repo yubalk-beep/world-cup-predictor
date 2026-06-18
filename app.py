@@ -1,6 +1,3 @@
-הנה הקוד המעודכן, הכולל את כל השיפורים שביקשת: כרטיסיות משחק מעוצבות ("קוביות"), שם היום בשבוע, חלוקה לסיבובים (Rounds) עם כותרות, עיצוב משופר לטבלה, וכל הנתונים (שעה, תאריך ותוצאות) כפי שביקשת.
-
-```python
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -150,5 +147,3 @@ with tab2:
         earned = sum(calc_points(*m["all_preds"].get(p, (0,0)), m['live_h'], m['live_a']) for m in matches if m["status"] in ["LIVE", "Finished"] and p in m["all_preds"])
         table_data.append({"Player": p, "Total Pts": baseline_points.get(p, 0) + earned})
     st.dataframe(pd.DataFrame(table_data).sort_values("Total Pts", ascending=False), hide_index=True, use_container_width=True)
-
-```
