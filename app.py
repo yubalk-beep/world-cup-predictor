@@ -137,11 +137,11 @@ with tab1:
             st.rerun()
             
         if is_locked:
-            st.markdown('<div class="predictions-box">', unsafe_allow_html=True)
-            st.markdown("<b>👥 All Predictions:</b>", unsafe_allow_html=True)
-            data = [{"Player": pl, "Prediction": f"{m['all_preds'].get(pl, 'Unsubmitted')}"} for pl in all_players]
-            st.table(pd.DataFrame(data))
-            st.markdown('</div>', unsafe_allow_html=True)
+            with st.expander("👥 View All Predictions"):
+                st.markdown('<div class="predictions-box">', unsafe_allow_html=True)
+                data = [{"Player": pl, "Prediction": f"{m['all_preds'].get(pl, 'Unsubmitted')}"} for pl in all_players]
+                st.table(pd.DataFrame(data))
+                st.markdown('</div>', unsafe_allow_html=True)
 
 with tab2:
     st.markdown("## 📊 League Standings")
