@@ -115,7 +115,6 @@ with tab1:
     for m in matches:
         if m['round'] != current_round:
             current_round = m['round']
-            # שינוי לכותרת עם Round וצבע כחול
             st.markdown(f'<div class="round-header">Round: {current_round}</div>', unsafe_allow_html=True)
         
         is_locked = m["status"] != "Upcoming"
@@ -138,13 +137,32 @@ with tab1:
             
         if is_locked:
             with st.expander("View All Predictions"):
-                data = [{"Player": pl, "Prediction": f"{m['all_preds'].get(pl, 'Unsubmitted')}"} for pl in all_players]
+                data = []
+                for pl in all_players:
+                    pred = m['all_preds'].get(pl, None)
+                    pts = calc_points(pred[0], pred[1], m['live_h'], m['live_a']) if pred else 0
+                    pred_disp = f"{pred[0]}-{pred[1]}" if pred else "Unsubmitted"
+                    data.append({"Player": pl, "Prediction": pred_disp, "Points": f"+{pts}"})
                 st.table(pd.DataFrame(data))
 
 with tab2:
     st.markdown("## 📊 League Standings")
     table_data = []
     for p in all_players:
-        earned = sum(calc_points(*m["all_preds"].get(p, (0,0)), m['live_h'], m['live_a']) for m in matches if m["status"] in ["LIVE", "Finished"] and p in m["all_preds"])
-        table_data.append({"Player": p, "Total Pts": baseline_points.get(p, 0) + earned})
-    st.dataframe(pd.DataFrame(table_data).sort_values("Total Pts", ascending=False), hide_index=True, use_container_width=True)
+        total_pts = baseline_points.get(p, 0)
+        current_pts = 0
+        for m in matches:
+            if m["status"] in ["LIVE", "Finished"]:
+                pred = m["all_preds"].get(p, None)
+                if pred:
+                    pts = calc_points(pred[0], pred[1], m['live_h'], m['live_a'])
+                    total_pts += pts
+                    if m["status"] == "LIVE": current_pts += pts
+        table_data.append({"Player": p, "Total": total_pts, "Current": current_pts})
+    
+    df = pd.DataFrame(table_data).sort_values("Total", ascending=False).reset_index(drop=True)
+    df.index = df.index + 1
+    df.insert(0, "Rank", df.index)
+    df['Trend'] = df['Current'].apply(lambda x: "⬆️" if x > 0 else "➖")
+    
+    st.dataframe(df[['Rank', 'Player', 'Total', 'Current', 'Trend']], hide_index=True, use_container_width=True)
