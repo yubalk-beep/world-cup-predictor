@@ -13,12 +13,11 @@ st.set_page_config(page_title="World Cup Predictor", page_icon="⚽", layout="ce
 API_KEY = "fca580857f6cf30156ef0e1526082430"
 SPREADSHEET_NAME = "WorldCupPredictions"
 
-# --- Google Sheets Connection Logic (Using Secrets) ---
+# --- Google Sheets Connection ---
 @st.cache_resource
 def init_sheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        # קריאה מתוך ה-Secrets שהגדרנו בסטרימליט
         creds_dict = st.secrets["connections"]["gspread"]["gspread_credentials"]
         creds_json = json.loads(creds_dict)
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_json, scope)
@@ -31,7 +30,6 @@ def init_sheets():
 
 sheet = init_sheets()
 
-# פונקציה לשליפת כל הניחושים הקיימים בטבלה
 def load_all_predictions(sheet_obj):
     if sheet_obj is None: return {}
     try:
@@ -47,7 +45,6 @@ def load_all_predictions(sheet_obj):
         return preds
     except Exception: return {}
 
-# פונקציה לשמירה בטבלה
 def save_prediction_to_sheet(sheet_obj, match_id, player, pred_home, pred_away):
     if sheet_obj is None: return
     try:
@@ -62,13 +59,13 @@ def save_prediction_to_sheet(sheet_obj, match_id, player, pred_home, pred_away):
             sheet_obj.update_cell(row_to_update, 4, int(pred_away))
         else:
             sheet_obj.append_row([str(match_id), str(player), int(pred_home), int(pred_away)])
-        st.success(f"Prediction saved!")
+        st.success("Prediction saved!")
     except Exception as e:
         st.error(f"Error saving: {e}")
 
 all_db_preds = load_all_predictions(sheet)
 
-# --- API Football Fetching ---
+# --- API Data ---
 @st.cache_data(ttl=60) 
 def get_live_fixtures():
     url = "https://v3.football.api-sports.io/fixtures"
@@ -84,7 +81,10 @@ def get_live_fixtures():
 
 api_matches = get_live_fixtures()
 all_players = ["King Levi", "Ballal1", "Dani uretsky", "King Adir", "King Sag", "Agadi1997", "Shmuelshoan", "Yuvi20", "BlancoChif"]
-baseline_points = {"King Levi": 225, "Ballal1": 215, "Dani uretsky": 205, "King Adir": 200, "King Sag": 190, "Agadi1997": 175, "Shmuelshoan": 165, "Yuvi20": 145, "BlancoChif": 140}
+baseline_points = {
+    "King Levi": 250, "King Sag": 245, "Ballal1": 245, "King Adir": 240, 
+    "Dani uretsky": 230, "Agadi1997": 225, "Shmuelshoan": 220, "Yuvi20": 185, "BlancoChif": 170
+}
 
 matches = []
 for am in api_matches:
@@ -92,13 +92,9 @@ for am in api_matches:
     is_live = am['fixture']['status']['short'] in ['1H', 'HT', '2H', 'ET', 'P', 'LIVE']
     is_finished = am['fixture']['status']['short'] in ['FT', 'AET', 'PEN']
     status_display = "LIVE" if is_live else ("Finished" if is_finished else "Upcoming")
-    
-    match_time_il = pd.to_datetime(am['fixture']['date']).tz_convert('Asia/Jerusalem').strftime('%d/%m/%Y %H:%M')
-    
     matches.append({
         "id": m_id, "home": am['teams']['home']['name'], "away": am['teams']['away']['name'],
-        "status": status_display, "date_str": match_time_il,
-        "live_home": am['goals']['home'] or 0, "live_away": am['goals']['away'] or 0,
+        "status": status_display, "live_home": am['goals']['home'] or 0, "live_away": am['goals']['away'] or 0,
         "all_preds": all_db_preds.get(m_id, {})
     })
 
@@ -112,32 +108,30 @@ def calc_points(pred_h, pred_a, actual_h, actual_a):
     if pred_h == actual_h and pred_a == actual_a: pts += 5
     return pts
 
+# --- UI ---
 tab1, tab2 = st.tabs(["My Predictions", "Live Table"])
-
 with tab1:
     selected_user = st.selectbox("Log in as:", all_players)
-    for m in matches: 
-        is_live_or_finished = m["status"] in ["LIVE", "Finished"]
+    for m in matches:
+        is_locked = m["status"] in ["LIVE", "Finished"]
         current_pred = m["all_preds"].get(selected_user, (0, 0))
-        with st.container():
-            st.markdown(f"#### {m['home']} vs {m['away']} - {m['status']}")
-            st.caption(f"🕒 {m['date_str']} (Israel Time)")
-            if m["status"] == "LIVE": st.markdown(f"### Live: {m['live_home']} - {m['live_away']}")
-            elif m["status"] == "Finished": st.markdown(f"**Final: {m['live_home']} - {m['live_away']}**")
-            
-            c1, c2 = st.columns(2)
-            ph = c1.number_input(f"{m['home']}", value=current_pred[0], disabled=is_live_or_finished, key=f"h_{m['id']}_{selected_user}")
-            pa = c2.number_input(f"{m['away']}", value=current_pred[1], disabled=is_live_or_finished, key=f"a_{m['id']}_{selected_user}")
-            
-            if not is_live_or_finished and st.button("Save 💾", key=f"btn_{m['id']}_{selected_user}"):
-                save_prediction_to_sheet(sheet, m['id'], selected_user, ph, pa)
-                st.rerun()
-            st.markdown("---")
+        st.markdown(f"#### {m['home']} vs {m['away']} - {m['status']}")
+        c1, c2 = st.columns(2)
+        ph = c1.number_input(f"{m['home']}", value=int(current_pred[0]), disabled=is_locked, key=f"h_{m['id']}_{selected_user}")
+        pa = c2.number_input(f"{m['away']}", value=int(current_pred[1]), disabled=is_locked, key=f"a_{m['id']}_{selected_user}")
+        if not is_locked and st.button("Save 💾", key=f"btn_{m['id']}_{selected_user}"):
+            save_prediction_to_sheet(sheet, m['id'], selected_user, ph, pa)
+            st.rerun()
+        if is_locked:
+            with st.expander("View Predictions"):
+                data = [{"Player": p, "Pred": f"{m['all_preds'].get(p, 'Unsubmitted')}"} for p in all_players]
+                st.table(pd.DataFrame(data))
+        st.markdown("---")
 
 with tab2:
     st.markdown("## Live Table")
     table_data = []
     for player in all_players:
-        total = baseline_points.get(player, 0) + sum(calc_points(*m["all_preds"].get(player, (0,0)), m['live_home'], m['live_away']) for m in matches if m["status"] in ["LIVE", "Finished"])
-        table_data.append({"Player": player, "Total Pts": total})
+        earned = sum(calc_points(*m["all_preds"].get(player, (0,0)), m['live_home'], m['live_away']) for m in matches if m["status"] in ["LIVE", "Finished"] and player in m["all_preds"])
+        table_data.append({"Player": player, "Total Pts": baseline_points.get(player, 0) + earned})
     st.dataframe(pd.DataFrame(table_data).sort_values("Total Pts", ascending=False), hide_index=True)
